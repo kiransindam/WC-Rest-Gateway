@@ -1,0 +1,52 @@
+name: Build and Release Plugin
+
+on:
+  push:
+    tags:
+      - "v*" # Triggers on tags like v1.0.0
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.1'
+      - name: Run Tests
+        run: echo "Running PHPUnit tests..." # Replace with actual phpunit command
+
+  build-and-release:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Build Plugin Zip
+        run: |
+          mkdir build
+          # Exclude dev files from the final zip
+          rsync -r --exclude={".git",".github","tests","node_modules",".gitignore"} . build/wc-rest-gateway
+          cd build && zip -r wc-rest-gateway.zip wc-rest-gateway
+
+      - name: Create GitHub Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref }}
+          release_name: Release ${{ github.ref }}
+          draft: false
+          prerelease: false
+
+      - name: Upload Release Asset
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./build/wc-rest-gateway.zip
+          asset_name: wc-rest-gateway.zip
+          asset_content_type: application/zip
